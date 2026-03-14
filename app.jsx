@@ -104,13 +104,32 @@ function App() {
     setCart(p => {
       const e = p.find(c => c.id === item.id);
       return e ? p.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c)
-               : [...p, { ...item, qty: 1 }];
+               : [...p, { ...item, qty: 1, note: "" }];
     });
   };
 
   const qtyUpdate = (id, d) => {
     setCart(p => p.map(c => c.id === id ? { ...c, qty: Math.max(0, c.qty + d) } : c).filter(c => c.qty > 0));
   };
+
+  const updateNote = (id, note) => {
+    setCart(p => p.map(c => c.id === id ? { ...c, note } : c));
+  };
+
+  const toggleChip = (id, chip) => {
+    setCart(p => p.map(c => {
+      if (c.id !== id) return c;
+      const current = c.note || "";
+      const chips = current.split(", ").filter(Boolean);
+      const has = chips.includes(chip);
+      const updated = has ? chips.filter(x => x !== chip) : [...chips, chip];
+      return { ...c, note: updated.join(", ") };
+    }));
+  };
+
+  const [editingNote, setEditingNote] = useState(null);
+
+  const QUICK_NOTES = ["Sin cebolla", "Sin verdura", "Con chile", "Extra queso", "Solo aguacate", "Solo cilantro", "Sin picante", "Con limón"];
 
   const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const count = cart.reduce((s, c) => s + c.qty, 0);
@@ -212,9 +231,16 @@ function App() {
 
             <div style={{ borderTop:"1px dashed #d1d1d6", borderBottom:"1px dashed #d1d1d6", padding:"12px 0", marginBottom:16 }}>
               {receipt.items.map((it,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", fontSize:16 }}>
-                  <span style={{ color:"#555" }}>{it.qty}× {it.name}</span>
-                  <span style={{ fontWeight:700 }}>{fmt(it.price*it.qty)}</span>
+                <div key={i} style={{ padding:"5px 0" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:16 }}>
+                    <span style={{ color:"#555" }}>{it.qty}× {it.name}</span>
+                    <span style={{ fontWeight:700 }}>{fmt(it.price*it.qty)}</span>
+                  </div>
+                  {it.note && (
+                    <div style={{ fontSize:13, color:"#c2410c", fontWeight:600, marginTop:2, paddingLeft:20 }}>
+                      📝 {it.note}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -337,19 +363,70 @@ function App() {
             {/* Cart items */}
             <div style={{ flex:1, overflowY:"auto", padding:"0 20px", WebkitOverflowScrolling:"touch" }}>
               {cart.map(item => (
-                <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 0", borderBottom:"0.5px solid #f0f0f0" }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:16, fontWeight:600 }}>{item.emoji} {item.name}</div>
-                    <div style={{ fontSize:14, color:"#8e8e93", marginTop:2 }}>{fmt(item.price)} c/u</div>
+                <div key={item.id} style={{ padding:"14px 0", borderBottom:"0.5px solid #f0f0f0" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:16, fontWeight:600 }}>{item.emoji} {item.name}</div>
+                      <div style={{ fontSize:14, color:"#8e8e93", marginTop:2 }}>{fmt(item.price)} c/u</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", background:"#f2f2f7", borderRadius:12, overflow:"hidden" }}>
+                      <button style={{ ...baseBtn, width:40, height:40, background:"transparent", fontSize:22, fontWeight:600, color:"#6366f1", display:"flex", alignItems:"center", justifyContent:"center" }}
+                        onClick={() => qtyUpdate(item.id,-1)}>−</button>
+                      <span style={{ width:30, textAlign:"center", fontSize:17, fontWeight:700 }}>{item.qty}</span>
+                      <button style={{ ...baseBtn, width:40, height:40, background:"transparent", fontSize:22, fontWeight:600, color:"#6366f1", display:"flex", alignItems:"center", justifyContent:"center" }}
+                        onClick={() => qtyUpdate(item.id,1)}>+</button>
+                    </div>
+                    <div style={{ minWidth:55, textAlign:"right", fontSize:17, fontWeight:700 }}>{fmt(item.price*item.qty)}</div>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", background:"#f2f2f7", borderRadius:12, overflow:"hidden" }}>
-                    <button style={{ ...baseBtn, width:40, height:40, background:"transparent", fontSize:22, fontWeight:600, color:"#6366f1", display:"flex", alignItems:"center", justifyContent:"center" }}
-                      onClick={() => qtyUpdate(item.id,-1)}>−</button>
-                    <span style={{ width:30, textAlign:"center", fontSize:17, fontWeight:700 }}>{item.qty}</span>
-                    <button style={{ ...baseBtn, width:40, height:40, background:"transparent", fontSize:22, fontWeight:600, color:"#6366f1", display:"flex", alignItems:"center", justifyContent:"center" }}
-                      onClick={() => qtyUpdate(item.id,1)}>+</button>
-                  </div>
-                  <div style={{ minWidth:55, textAlign:"right", fontSize:17, fontWeight:700 }}>{fmt(item.price*item.qty)}</div>
+
+                  {/* Note display / toggle */}
+                  {item.note && editingNote !== item.id && (
+                    <div onClick={() => setEditingNote(item.id)}
+                      style={{ marginTop:6, padding:"6px 10px", background:"#fff7ed", borderRadius:10, border:"1px solid #fed7aa",
+                        fontSize:13, color:"#c2410c", fontWeight:600, cursor:"pointer" }}>
+                      📝 {item.note}
+                    </div>
+                  )}
+
+                  {!item.note && editingNote !== item.id && (
+                    <button onClick={() => setEditingNote(item.id)}
+                      style={{ ...baseBtn, marginTop:6, padding:"5px 10px", background:"transparent",
+                        fontSize:13, color:"#8e8e93", fontWeight:600 }}>
+                      + Agregar nota
+                    </button>
+                  )}
+
+                  {/* Note editor */}
+                  {editingNote === item.id && (
+                    <div style={{ marginTop:8, animation:"popIn 0.2s ease" }}>
+                      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
+                        {QUICK_NOTES.map(chip => {
+                          const chips = (item.note || "").split(", ").filter(Boolean);
+                          const isActive = chips.includes(chip);
+                          return (
+                            <button key={chip} onClick={() => toggleChip(item.id, chip)}
+                              style={{ ...baseBtn, padding:"6px 12px", borderRadius:20, fontSize:12, fontWeight:700,
+                                border: isActive ? "2px solid #ea580c" : "1.5px solid #e5e5ea",
+                                background: isActive ? "#fff7ed" : "#fff",
+                                color: isActive ? "#ea580c" : "#8e8e93" }}>
+                              {chip}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:"flex", gap:6 }}>
+                        <input type="text" placeholder="Otra nota…"
+                          value={item.note || ""} onChange={e => updateNote(item.id, e.target.value)}
+                          style={{ flex:1, padding:"8px 12px", border:"1.5px solid #e5e5ea", borderRadius:10,
+                            fontSize:14, outline:"none", background:"#fafafa", WebkitAppearance:"none" }} />
+                        <button onClick={() => setEditingNote(null)}
+                          style={{ ...baseBtn, padding:"8px 14px", borderRadius:10, background:"#f2f2f7",
+                            fontSize:13, fontWeight:700, color:"#1c1c1e" }}>
+                          ✓
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -592,7 +669,14 @@ function App() {
 
                   <div style={{ padding:"10px 0", borderTop:"0.5px solid #f0f0f0", marginTop:10 }}>
                     {o.items.map((it,j) => (
-                      <div key={j} style={{ fontSize:15, color:"#555", padding:"3px 0" }}><b>{it.qty}×</b> {it.name}</div>
+                      <div key={j} style={{ padding:"3px 0" }}>
+                        <div style={{ fontSize:15, color:"#555" }}><b>{it.qty}×</b> {it.name}</div>
+                        {it.note && (
+                          <div style={{ fontSize:12, color:"#c2410c", fontWeight:600, marginTop:1, paddingLeft:20 }}>
+                            📝 {it.note}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
 
